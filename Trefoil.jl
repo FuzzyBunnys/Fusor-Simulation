@@ -1,0 +1,247 @@
+### A Pluto.jl notebook ###
+# v0.12.20
+
+using Markdown
+using InteractiveUtils
+
+# ╔═╡ 1fb27f10-4df5-11eb-0858-f365aad0b2a9
+md"### The Trefoil"
+
+# ╔═╡ b03c3810-4e0d-11eb-2fec-178df859647d
+#packages and depencies
+begin
+	import Pkg
+	Pkg.activate(mktempdir())
+	Pkg.Registry.update()
+end
+
+# ╔═╡ d1632850-4e0d-11eb-18fe-8d4052bede3e
+begin
+	Pkg.add("Plots")
+	using Plots
+	Pkg.add("PlotlyJS")
+	plotly()
+end
+
+# ╔═╡ 644d2230-4e57-11eb-046f-370ae0644ad5
+#loading the QuadGK package
+begin
+	Pkg.add("QuadGK")
+	using QuadGK
+end
+
+# ╔═╡ 92ae9e20-4eb0-11eb-1a8c-79ab6a17b1d8
+begin
+	Pkg.add("GeometryBasics")
+	Pkg.add("Images")
+	using GeometryBasics
+	using LinearAlgebra
+	using Images
+end
+
+# ╔═╡ 8f1c2890-4eb0-11eb-03f8-49c0326633c4
+begin
+	Pkg.add("Meshing")
+	using Meshing
+end
+
+# ╔═╡ abb69cd0-4df5-11eb-3ecd-7b1c6e4863f2
+md"So now we can begin with a more complicated knot. As before all of this work was initially done by [Max Lipton](https://e.math.cornell.edu/people/ml2437/) in Python. This is a reimplementation in Julia. We first need a parametrization of the trefoil so that we can setup our integral. The $x,y$ and $z$ coordinates of our trefoil knot will have the following form. Their implementation in code is immediately below each equation."
+
+# ╔═╡ 94dfc220-4e04-11eb-1301-1dcd15030627
+md"$x = \sin(t) + 2\sin(2t)$"
+
+# ╔═╡ 279a6e3e-4e04-11eb-20cf-1745e01b5978
+function trefx(t)
+	sin.(t).+ 2 .*sin.(2 .*t)
+end
+
+# ╔═╡ a9bc7cb0-4e04-11eb-12c2-e3dd2668bd28
+md"$y = \cos(t) - 2 \cos(2t)$"
+
+# ╔═╡ bce74180-4e04-11eb-27a9-5f08876a9fb4
+function trefy(t)
+	cos.(t) .- (2 .*cos.(2 .*t))
+end
+
+# ╔═╡ aa9ca37e-4e04-11eb-2e75-c1e2d7b05415
+md"$z = -\sin(3t)$"
+
+# ╔═╡ cf9ef930-4e04-11eb-0c5f-c1fd70a8b323
+function trefz(t)
+	-1 .*sin.(3 .*t)
+end
+
+# ╔═╡ 47530c00-4e05-11eb-01c3-4304b1787760
+md"$r'(t)=8\cos(3t)+4.5\cos(6t)+21.5$"
+
+# ╔═╡ 396c6460-4e05-11eb-2f8c-f91c12fb666e
+function trefnum(t)
+	(8 .*cos.(3 .*t)) .+ (4.5.*cos(6 .*t)) .+ 21.5
+end
+
+# ╔═╡ c7df2970-4e0b-11eb-0f11-1575fb965a1c
+md"Having completed the parametrization of the trefoil knot we can now graph it. To do that we'll need our trusty parametrization variable $t$, and our integration order variable."
+
+# ╔═╡ 23eef8d0-4e0c-11eb-046d-35612da16588
+t = 0:(2*pi/1000):2*pi # think this is a more compact way of writing the range object
+
+# ╔═╡ b8ac4090-4eac-11eb-28de-cbf12a7db67d
+quadorder=5 #can change this to increase the accuracy of the integral
+
+# ╔═╡ 9057b2de-4e0d-11eb-233c-15f583216ae4
+md"And then we can plot the thing!"
+
+# ╔═╡ 6966ac90-4e0d-11eb-20eb-3339c5e1a543
+plot(trefx(t),trefy(t),trefz(t), title = "The Trefoil Knot")
+
+# ╔═╡ d71cffce-4e0f-11eb-356d-53b698951ed6
+md"So we've got a great idea of the shape of our knot, we can now move on to the specific form of our integral."
+
+# ╔═╡ ee7e9e40-4e14-11eb-0b14-d1320ffc9228
+md"$\phi=\int_0^{2\pi} \frac{\sqrt{8\cos(3t)+4.5\cos(6t)+21.5}}{\sqrt{(x-(\sin(t) + 2\sin(2t)))^2+(y-(\cos(t) - 2 \cos(2t)))^2+(z-(-\sin(3t)))^2)}}dt$"
+
+# ╔═╡ 179299b2-4e17-11eb-3452-d5e7e8d35a74
+md"It looks pretty intimidating, and no doubt would not be fun to integrate by hand. But the key is to note that numerator and denominator of the fraction are respectively $|r'(t)|$ and $\sqrt{a^2+b^2+c^2}$ or the pythagorean theorem. The integral simply compares the distance from a point in space to our knot and the change in the electric field. Here obviously the distance is computed where $a,b$ and $c$ are the $x,y$ and $z$ coordinates and must be compared with the specific parametrization of the knot. Then just as before we're going to want to go ahead an implement our fraction in Julia."
+
+# ╔═╡ a6f1a240-4e17-11eb-2c1a-17bec436fac4
+function trefoilintegral(a,b,c,t)
+	(sqrt(trefnum(t)))/(sqrt((a-trefx(t))^2 +(b-trefy(t))^2 +(c-trefz(t))^2))
+end
+
+# ╔═╡ fd080f90-4e56-11eb-124f-c3e3ea802f0b
+#setup our storage matrix
+A = zeros(41,41,41)
+
+# ╔═╡ c273c3a0-4e57-11eb-075c-07416145e730
+md"We've copied our slightly messy implementation from the Unknot. Right now the code doesn't scale with the precision, to do that I'd need to set a precision variable, have the matrix A be calculated to some increased size, and then change the formula in the potential calculation to correctly assign values to the matrix. Right now that seems like a bit much so we're going to leave it as is below."
+
+# ╔═╡ 8b98a490-4e57-11eb-1db6-395910dda2bb
+function trefoilpotential(a,b,c,A)
+	ans, err = quadgk(t->trefoilintegral(a,b,c,t),0,(2*pi),order=quadorder) 
+	# we'll use the default errors to start
+	A[floor(Int,(10*a+21)),floor(Int,(10*b+21)),floor(Int,(10*c+21))]=ans
+	return [a,b,c,ans,err]
+end
+
+
+# ╔═╡ fadcfcc0-4e57-11eb-15da-e7ef2df89fa6
+md"From here obviously we're going to integrate the function again by passing it a list comprehension. Again we need to disallow those points that are part of the trefoil knot from our actual integration. That'll cause the function to blow up towards infinity. Recall that a conditional list comprehension includes a point in the series generated by the list comprehension if the logical condition is true. To test if a point is on the trefoil or not (hee!) we're going to use some basic linear algebra. Note the following for our parametrization:"
+
+# ╔═╡ 6f5a81f0-4ee2-11eb-05b1-57efe4f35c09
+md"$z = r_{z}(t)$"
+
+# ╔═╡ 8ec1e7e0-4ee2-11eb-0dc3-6b4afe417cd3
+md"It then follows immediately that:"
+
+# ╔═╡ 8b0ea3e0-4ee2-11eb-11ff-3b164a777a72
+md"$r_z^{-1}(z)=t$"
+
+# ╔═╡ f79effa2-4ee2-11eb-09d8-037d6175ae53
+md"So if we recall some Linear Algebra, we can see that if we solve the inverse parameterized equation $r^{-1}(x,y,z)$ and obtain the same $t_0$ for each coordinate $x,y$ or $z$ then the point lies on the trefoil and we disallow it from the integration."
+
+# ╔═╡ 49d85400-4f89-11eb-2a5a-a3005293f900
+md"After asking a [question](https://math.stackexchange.com/questions/3973318/inverse-of-trefoil-knot-paramaterization) on the mathematics stack exchange, one of the answers pointed out that there were a limited number of values $t$ could have for any integer value of $z$. So I'm going to use this $sneaky\: trick^{TM}$ to test if a point is on my knot! So to start we obviously want to use our value of $z$ to solve for $t$. The algebra is pretty simple so we'll just state it below."
+
+# ╔═╡ 5aa09c2e-4ee3-11eb-136f-ebd478de088c
+md"$r_z^{-1}(z)=\frac{\sin^{-1}(-z)}{3}=t$"
+
+# ╔═╡ aaebdf60-4f8d-11eb-13cc-9b7b50e70816
+md"To see the limited values for $t$ we first have to recall our trig, let's take a look at $\sin(t)$ and $\sin(3t)$. Immediately by observation we can see that there are $2$ solutions (at $0$) for $\sin(t)$ and $6$ solutions for $\sin(3t)$ thanks to the $3$ in the $\sin()$. From observation of the graph of our trefoil knot above we can see that the range of values for $z$ is limited between $-1$ and $1$. If $z$ is not within that range then it can't be on the knot. So if we plug in any value of $z$ in our range of interest, we have at most 6 possibilities for $t$. We can then use those values of $t$ to calculate $y$ and $x$ and check if they match!"
+
+# ╔═╡ c41a67e0-4f8d-11eb-125c-87f5e9b8a834
+begin
+	plot(sin.(t))
+	plot!(sin.(3 .*t))
+end
+
+
+# ╔═╡ 1434fb30-4f95-11eb-3cc1-6f1ca289d01a
+md"So we now have a function below that tests our input values based on the parameters above. It checks if $z$ is within the danger zone, then if it is goes ahead and does some basic linear algebra to test if the point is on the knot itself or around it. Unfortunately I'm still getting an integration error with this solution, so I must have a point that's a bit too close to the knot. I'll have to include a solution to test if it's within some distance of the knot."
+
+# ╔═╡ 4b15ba70-4ee3-11eb-2ada-55e5058ece6b
+function testtrefz(x,y,z) #so this test function will return true or false
+	if z>1
+		return true
+	elseif z<-1
+		return true
+	else
+		t= (asin(-1*z))/3
+		a = trefx(t)
+		b = trefy(t)
+		if x==a && y==b
+			return false # the point is on the knot so GET OUTTA HERE
+		else
+			return true
+		end
+	end
+end
+
+# ╔═╡ a3ae85f0-4eab-11eb-1d34-2390941d931e
+inflatetrefoil(f,N,p,A,t)=[f(x,y,z,A) for x in -1*N:p:N, y in -1*N:p:N, z in -1*N:p:N if testtrefz(x,y,z) ] # think this parametrization is correct
+
+# ╔═╡ d8e6d502-4eac-11eb-0484-45fbcf233396
+ans = inflatetrefoil(trefoilpotential,2,0.1,A,(0:0.1:2*pi))#actually do the damn thing
+
+# ╔═╡ c07bc6c0-4eb0-11eb-2d3e-033897508f96
+c = A[20,20,20]+0.5
+
+# ╔═╡ f2b1bd2e-4eaf-11eb-2728-d79138ab19ea
+#marching cubes to extract the surface
+points,surfaces = isosurface(A,MarchingCubes(iso=c), origin = Vec(1,1,1), widths = Vec(4.0,4.0,4.0)) 
+
+# ╔═╡ 24ee07be-4e58-11eb-01b3-b1525371872c
+scatter([a for (a,_,_) in points],[b for (_,b,_) in points], [c for (_,_,c) in points] , title = "Trefoil Potential", ms = 1)
+
+# ╔═╡ 4f3163a0-5098-11eb-2311-554b96fcfaf5
+md"## Critical Points"
+
+# ╔═╡ 666ef190-5098-11eb-3794-272c69604f69
+md"As before with the unknot we want to examine the critical points of the trefoil knot. The first step is to state the equations for the rate of change of $x,y$ and $z$ coordinates."
+
+# ╔═╡ Cell order:
+# ╟─1fb27f10-4df5-11eb-0858-f365aad0b2a9
+# ╠═b03c3810-4e0d-11eb-2fec-178df859647d
+# ╠═d1632850-4e0d-11eb-18fe-8d4052bede3e
+# ╠═644d2230-4e57-11eb-046f-370ae0644ad5
+# ╠═92ae9e20-4eb0-11eb-1a8c-79ab6a17b1d8
+# ╠═8f1c2890-4eb0-11eb-03f8-49c0326633c4
+# ╟─abb69cd0-4df5-11eb-3ecd-7b1c6e4863f2
+# ╟─94dfc220-4e04-11eb-1301-1dcd15030627
+# ╠═279a6e3e-4e04-11eb-20cf-1745e01b5978
+# ╟─a9bc7cb0-4e04-11eb-12c2-e3dd2668bd28
+# ╠═bce74180-4e04-11eb-27a9-5f08876a9fb4
+# ╟─aa9ca37e-4e04-11eb-2e75-c1e2d7b05415
+# ╠═cf9ef930-4e04-11eb-0c5f-c1fd70a8b323
+# ╟─47530c00-4e05-11eb-01c3-4304b1787760
+# ╠═396c6460-4e05-11eb-2f8c-f91c12fb666e
+# ╟─c7df2970-4e0b-11eb-0f11-1575fb965a1c
+# ╠═23eef8d0-4e0c-11eb-046d-35612da16588
+# ╠═b8ac4090-4eac-11eb-28de-cbf12a7db67d
+# ╟─9057b2de-4e0d-11eb-233c-15f583216ae4
+# ╠═6966ac90-4e0d-11eb-20eb-3339c5e1a543
+# ╟─d71cffce-4e0f-11eb-356d-53b698951ed6
+# ╟─ee7e9e40-4e14-11eb-0b14-d1320ffc9228
+# ╟─179299b2-4e17-11eb-3452-d5e7e8d35a74
+# ╠═a6f1a240-4e17-11eb-2c1a-17bec436fac4
+# ╠═fd080f90-4e56-11eb-124f-c3e3ea802f0b
+# ╟─c273c3a0-4e57-11eb-075c-07416145e730
+# ╠═8b98a490-4e57-11eb-1db6-395910dda2bb
+# ╟─fadcfcc0-4e57-11eb-15da-e7ef2df89fa6
+# ╟─6f5a81f0-4ee2-11eb-05b1-57efe4f35c09
+# ╟─8ec1e7e0-4ee2-11eb-0dc3-6b4afe417cd3
+# ╟─8b0ea3e0-4ee2-11eb-11ff-3b164a777a72
+# ╟─f79effa2-4ee2-11eb-09d8-037d6175ae53
+# ╟─49d85400-4f89-11eb-2a5a-a3005293f900
+# ╟─5aa09c2e-4ee3-11eb-136f-ebd478de088c
+# ╟─aaebdf60-4f8d-11eb-13cc-9b7b50e70816
+# ╟─c41a67e0-4f8d-11eb-125c-87f5e9b8a834
+# ╟─1434fb30-4f95-11eb-3cc1-6f1ca289d01a
+# ╠═4b15ba70-4ee3-11eb-2ada-55e5058ece6b
+# ╠═a3ae85f0-4eab-11eb-1d34-2390941d931e
+# ╠═d8e6d502-4eac-11eb-0484-45fbcf233396
+# ╠═c07bc6c0-4eb0-11eb-2d3e-033897508f96
+# ╠═f2b1bd2e-4eaf-11eb-2728-d79138ab19ea
+# ╠═24ee07be-4e58-11eb-01b3-b1525371872c
+# ╟─4f3163a0-5098-11eb-2311-554b96fcfaf5
+# ╠═666ef190-5098-11eb-3794-272c69604f69
